@@ -1,4 +1,4 @@
-const CACHE = 'focustimer-v2';
+const CACHE = 'focustimer-v3';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './klankschaal.mp3'];
 
 self.addEventListener('install', (event) => {
@@ -15,18 +15,25 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Netwerk eerst (updates komen direct door), cache als fallback zodat de app ook zonder Mac/wifi start.
+// Netwerk eerst (updates komen direct door), cache als fallback zodat de app ook zonder wifi start.
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  if (new URL(event.request.url).origin !== self.location.origin) return;
+  const request = event.request;
+  if (request.method !== 'GET') return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // GitHub Pages serveert met max-age=600. Zonder no-store zou de pagina tot tien minuten na een
+  // uitrol alsnog uit de browsercache komen; voor afbeeldingen en geluid is die cache juist prima.
+  const isPagina = request.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('.html');
+  const netwerk = isPagina ? fetch(url.href, { cache: 'no-store' }) : fetch(request);
 
   event.respondWith(
-    fetch(event.request)
+    netwerk
       .then((response) => {
         const copy = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        caches.open(CACHE).then((cache) => cache.put(request, copy));
         return response;
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
+      .catch(() => caches.match(request).then((cached) => cached || caches.match('./index.html')))
   );
 });
