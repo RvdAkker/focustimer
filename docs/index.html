@@ -235,6 +235,15 @@
     cursor: pointer;
   }
   .timer-start-btn:hover { filter: brightness(0.95); }
+  .timer-start-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .timer-start-btn:disabled:hover { filter: none; }
+  .task-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: -4px 0 8px;
+    text-align: center;
+  }
+  .task-hint:empty { display: none; }
   .timer-summary {
     display: flex;
     justify-content: space-between;
@@ -318,6 +327,7 @@
 
   <div class="timer-card" id="timerCard">
     <textarea id="taskNameInput" class="task-name-input" placeholder="Wat ga ik doen en waarom is deze taak belangrijk?" rows="1"></textarea>
+    <div id="taskHint" class="task-hint"></div>
     <div id="timerPhases"></div>
     <div class="timer-actions" id="timerActions">
       <select id="timerAddPhase" class="soft" aria-label="Fase toevoegen">
@@ -450,12 +460,30 @@ function resizeTaskNameInput() {
   textarea.style.height = `${textarea.scrollHeight}px`;
 }
 
+// START mag pas als er een taakomschrijving staat én een toelichting waarom die belangrijk is.
+const REASON_PATTERN = /\b(omdat|want|zodat|daarom|belangrijk|van belang|doel|reden|nodig|essentieel|dus)\b/i;
+
+function taskInfoProblem(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return 'Vul eerst in wat je gaat doen en waarom dat belangrijk is.';
+  if (trimmed.split(/\s+/).length < 4) return 'Omschrijf de taak iets uitgebreider.';
+  if (!REASON_PATTERN.test(trimmed)) return 'Licht ook toe waarom deze taak belangrijk is (bijv. "… omdat …").';
+  return null;
+}
+
+function updateStartGate() {
+  const problem = timerRunning ? null : taskInfoProblem(taskName);
+  el('taskHint').textContent = problem || '';
+  el('timerStartStop').disabled = !!problem;
+}
+
 el('taskNameInput').value = taskName;
 resizeTaskNameInput();
 el('taskNameInput').addEventListener('input', (e) => {
   taskName = e.target.value;
   saveTaskName();
   resizeTaskNameInput();
+  updateStartGate();
 });
 
 function loadTaskName() {
@@ -584,6 +612,7 @@ function renderTimer() {
 
   const startStopBtn = el('timerStartStop');
   startStopBtn.textContent = timerRunning ? 'STOP' : 'START';
+  updateStartGate();
   el('timerActions').style.display = timerRunning ? 'none' : 'flex';
   el('timerTemplatesContent').style.display = timerRunning ? 'none' : '';
 
@@ -712,7 +741,7 @@ function submitLogEntry(minutes, stoppedEarly, when) {
 }
 
 function startTimer() {
-  if (timerPhases.length === 0) return;
+  if (timerPhases.length === 0 || taskInfoProblem(taskName)) return;
   timerRunning = true;
   enterPhase(0, Date.now() + timerPhases[0].minutes * 60000);
   timerEndTimestamp = new Date(Date.now() + timerTotalMinutes(timerPhases) * 60000);
