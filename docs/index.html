@@ -679,9 +679,55 @@ function enterPhase(index, endAtMs) {
   timerRemainingSeconds = Math.max(0, Math.ceil((endAtMs - Date.now()) / 1000));
 }
 
+// Klankschaal: een echte bowl klinkt inharmonisch, dus geen nette boventoonreeks. Elk paar
+// staat een fractie uit elkaar; dat zweven geeft het karakteristieke trillen. ~10 sec uitklinken.
+const BOWL_BASE_HZ = 196;
+const BOWL_PARTIALS = [
+  { ratio: 1, gain: 0.50, decay: 10 },
+  { ratio: 2.74, gain: 0.26, decay: 7.5 },
+  { ratio: 5.42, gain: 0.13, decay: 5 },
+  { ratio: 8.93, gain: 0.06, decay: 3.5 },
+];
+let audioCtx = null;
+// Alleen gevuld tijdens tests, zodat gemeten kan worden dat er echt geluid uit komt.
+let bowlOutput = null;
+
+function ensureAudio() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!audioCtx) audioCtx = new Ctx();
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
+
+function playBowl() {
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const master = ctx.createGain();
+  master.gain.value = 0.7;
+  master.connect(bowlOutput || ctx.destination);
+
+  for (const { ratio, gain, decay } of BOWL_PARTIALS) {
+    for (const detune of [-0.6, 0.6]) {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = BOWL_BASE_HZ * ratio + detune;
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(gain / 2, now + 0.02);
+      env.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+      osc.connect(env).connect(master);
+      osc.start(now);
+      osc.stop(now + decay + 0.1);
+    }
+  }
+}
+
 function syncTimer() {
   if (!timerRunning) return;
   let remainingMs = phaseEndAt - Date.now();
+  let overgangen = 0;
   while (remainingMs <= 0) {
     const next = timerPhaseIndex + 1;
     if (next >= timerPhases.length) {
@@ -690,7 +736,10 @@ function syncTimer() {
     }
     enterPhase(next, phaseEndAt + timerPhases[next].minutes * 60000);
     remainingMs = phaseEndAt - Date.now();
+    overgangen += 1;
   }
+  // Na een lange achtergrondperiode kunnen meerdere fases tegelijk verlopen zijn: dan één keer klinken.
+  if (overgangen > 0) playBowl();
   timerRemainingSeconds = Math.ceil(remainingMs / 1000);
   renderTimer();
 }
@@ -703,6 +752,7 @@ function advanceToNextPhase() {
   }
   enterPhase(next, Date.now() + timerPhases[next].minutes * 60000);
   timerEndTimestamp = new Date(Date.now() + timerRemainingTotalSeconds() * 1000);
+  playBowl();
   renderTimer();
 }
 
@@ -795,10 +845,12 @@ function startTimer() {
   timerEndTimestamp = new Date(Date.now() + timerTotalMinutes(timerPhases) * 60000);
   timerIntervalId = setInterval(syncTimer, 1000);
   acquireWakeLock();
+  ensureAudio(); // iOS laat geluid alleen toe als het tijdens een tik is vrijgegeven.
   renderTimer();
 }
 
 function stopTimer(completed, endedAt) {
+  if (completed) playBowl();
   const plannedMinutes = timerTotalMinutes(timerPhases);
   if (!completed) timerRemainingSeconds = Math.max(0, Math.ceil((phaseEndAt - Date.now()) / 1000));
   const minutes = completed
