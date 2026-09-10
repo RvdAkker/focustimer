@@ -42,6 +42,7 @@
     --red: #ff5c5c;
   }
   * { box-sizing: border-box; }
+  html, body { overflow-x: hidden; }
   body {
     margin: 0;
     min-height: 100vh;
@@ -52,7 +53,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    padding: 48px 24px;
+    padding: max(10px, env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
   }
   .page { width: 100%; max-width: 420px; }
   .page-header {
@@ -80,7 +81,10 @@
     font-weight: 400;
     padding: 4px 8px;
     border-radius: 4px;
-    white-space: nowrap;
+    /* Geen nowrap: een brede tooltip telt mee voor de scrollbreedte, ook als hij verborgen is,
+       en maakt de pagina op de telefoon horizontaal verschuifbaar. */
+    width: min(300px, calc(100vw - 48px));
+    overflow-wrap: anywhere;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -106,7 +110,8 @@
     justify-content: center;
   }
   .theme-toggle:hover { border-color: var(--accent); }
-  .header-logo { flex-shrink: 0; }
+  .header-logo { min-width: 0; max-width: 100%; height: auto; }
+  .page-header h1 { white-space: nowrap; }
   .timer-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
