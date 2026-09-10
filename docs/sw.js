@@ -1,5 +1,5 @@
-const CACHE = 'focustimer-v1';
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const CACHE = 'focustimer-v2';
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './klankschaal.mp3'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

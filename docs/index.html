@@ -679,16 +679,14 @@ function enterPhase(index, endAtMs) {
   timerRemainingSeconds = Math.max(0, Math.ceil((endAtMs - Date.now()) / 1000));
 }
 
-// Klankschaal: een echte bowl klinkt inharmonisch, dus geen nette boventoonreeks. Elk paar
-// staat een fractie uit elkaar; dat zweven geeft het karakteristieke trillen. ~10 sec uitklinken.
-const BOWL_BASE_HZ = 196;
-const BOWL_PARTIALS = [
-  { ratio: 1, gain: 0.50, decay: 10 },
-  { ratio: 2.74, gain: 0.26, decay: 7.5 },
-  { ratio: 5.42, gain: 0.13, decay: 5 },
-  { ratio: 8.93, gain: 0.06, decay: 3.5 },
-];
+// Klankschaal-opname. Het bestand duurt 16 sec; we laten er ~10 van horen en faden het laatste
+// stuk uit, zodat de lengte in code te wijzigen is zonder het bestand opnieuw te bewerken.
+const BOWL_FILE = 'klankschaal.mp3';
+const BOWL_SECONDS = 10;
+const BOWL_FADE_SECONDS = 1.5;
 let audioCtx = null;
+let bowlBuffer = null;
+let bowlLoading = null;
 // Alleen gevuld tijdens tests, zodat gemeten kan worden dat er echt geluid uit komt.
 let bowlOutput = null;
 
@@ -700,28 +698,38 @@ function ensureAudio() {
   return audioCtx;
 }
 
+function loadBowl(ctx) {
+  if (bowlBuffer) return Promise.resolve(bowlBuffer);
+  if (!bowlLoading) {
+    bowlLoading = fetch(BOWL_FILE)
+      .then((res) => res.arrayBuffer())
+      .then((bytes) => ctx.decodeAudioData(bytes))
+      .then((buffer) => { bowlBuffer = buffer; return buffer; })
+      .catch(() => { bowlLoading = null; return null; });
+  }
+  return bowlLoading;
+}
+
+function startBowl(ctx, buffer) {
+  if (!buffer) return;
+  const now = ctx.currentTime;
+  const duur = Math.min(BOWL_SECONDS, buffer.duration);
+  const source = ctx.createBufferSource();
+  const env = ctx.createGain();
+  source.buffer = buffer;
+  env.gain.setValueAtTime(1, now);
+  env.gain.setValueAtTime(1, now + Math.max(0, duur - BOWL_FADE_SECONDS));
+  env.gain.linearRampToValueAtTime(0, now + duur);
+  source.connect(env).connect(bowlOutput || ctx.destination);
+  source.start(now);
+  source.stop(now + duur);
+}
+
 function playBowl() {
   const ctx = ensureAudio();
   if (!ctx) return;
-  const now = ctx.currentTime;
-  const master = ctx.createGain();
-  master.gain.value = 0.7;
-  master.connect(bowlOutput || ctx.destination);
-
-  for (const { ratio, gain, decay } of BOWL_PARTIALS) {
-    for (const detune of [-0.6, 0.6]) {
-      const osc = ctx.createOscillator();
-      const env = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = BOWL_BASE_HZ * ratio + detune;
-      env.gain.setValueAtTime(0, now);
-      env.gain.linearRampToValueAtTime(gain / 2, now + 0.02);
-      env.gain.exponentialRampToValueAtTime(0.0001, now + decay);
-      osc.connect(env).connect(master);
-      osc.start(now);
-      osc.stop(now + decay + 0.1);
-    }
-  }
+  if (bowlBuffer) startBowl(ctx, bowlBuffer);
+  else loadBowl(ctx).then((buffer) => startBowl(ctx, buffer));
 }
 
 function syncTimer() {
@@ -845,7 +853,10 @@ function startTimer() {
   timerEndTimestamp = new Date(Date.now() + timerTotalMinutes(timerPhases) * 60000);
   timerIntervalId = setInterval(syncTimer, 1000);
   acquireWakeLock();
-  ensureAudio(); // iOS laat geluid alleen toe als het tijdens een tik is vrijgegeven.
+  // iOS laat geluid alleen toe als het tijdens een tik is vrijgegeven; meteen inladen scheelt
+  // vertraging bij de eerste overgang.
+  const ctx = ensureAudio();
+  if (ctx) loadBowl(ctx);
   renderTimer();
 }
 

@@ -14,6 +14,7 @@ const MIME_TYPES = {
   '.webmanifest': 'application/manifest+json',
   '.json': 'application/json',
   '.png': 'image/png',
+  '.mp3': 'audio/mpeg',
 };
 
 function formatDateLocal(date) {
