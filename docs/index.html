@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Focustimer</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f7f6f4">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Focustimer">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #f7f6f4;
+    --bg-card: #ffffff;
+    --border: #e2e0da;
+    --border-light: #eeece6;
+    --text: #161616;
+    --text-muted: #767469;
+    --accent: #F26419;
+    --accent-soft: #fde6da;
+    --on-accent: #ffffff;
+    --red: #c23f3f;
+    --radius: 8px;
+    --timer-blue-bg: #00A383; --timer-blue: #ffffff;
+    --timer-pink-bg: #FF6400; --timer-pink: #000000;
+    --timer-yellow-bg: #FFA100; --timer-yellow: #000000;
+    --timer-green-bg: #0F4DA8; --timer-green: #000000;
+  }
+  :root[data-theme="dark"] {
+    --bg: #1a1a1a;
+    --bg-card: #232323;
+    --border: #3a3a3a;
+    --border-light: #333333;
+    --text: #dcddde;
+    --text-muted: #8a8a8a;
+    --accent: #F26419;
+    --accent-soft: rgba(242, 100, 25, 0.18);
+    --on-accent: #ffffff;
+    --red: #ff5c5c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.4;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 48px 24px;
+  }
+  .page { width: 100%; max-width: 420px; }
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .page-header h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .icon-hint {
+    position: relative;
+    cursor: pointer;
+  }
+  .icon-tooltip {
+    position: absolute;
+    top: 130%;
+    left: 0;
+    background: var(--text);
+    color: var(--bg-card);
+    font-size: 11px;
+    font-weight: 400;
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .icon-hint:hover .icon-tooltip {
+    opacity: 1;
+    visibility: visible;
+  }
+  .theme-toggle {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .theme-toggle:hover { border-color: var(--accent); }
+  .header-logo { flex-shrink: 0; }
+  .timer-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .task-name-input {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 32px;
+    font-size: 15px;
+    font-family: inherit;
+    text-align: center;
+    line-height: 1.4;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text);
+    padding: 6px 10px;
+    margin-bottom: 10px;
+    resize: none;
+    overflow: hidden;
+  }
+  .task-name-input:disabled {
+    color: var(--text);
+    opacity: 1;
+    background: var(--border-light);
+  }
+  .timer-phase {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    border: 1px solid transparent;
+    transition: opacity 0.15s;
+  }
+  .timer-phase-label {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    color: inherit;
+    padding: 2px 0;
+  }
+  .timer-phase-label:read-only { color: inherit; cursor: inherit; }
+  .timer-phase-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .timer-phase-minutes {
+    width: 54px;
+    box-sizing: border-box;
+    height: 32px;
+    font-size: 15px;
+    text-align: right;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text);
+    padding: 0 6px;
+  }
+  .timer-phase-countdown {
+    box-sizing: border-box;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    min-width: 48px;
+    text-align: right;
+  }
+  .timer-phase-unit {
+    font-size: 13px;
+    color: inherit;
+    opacity: 0.8;
+  }
+  .timer-phase-remove {
+    border: none;
+    background: transparent;
+    color: inherit;
+    opacity: 0.8;
+    cursor: pointer;
+    font-size: 15px;
+    padding: 2px 4px;
+    line-height: 1;
+  }
+  .timer-phase-remove:hover { opacity: 1; color: var(--red); }
+  .timer-actions {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0;
+  }
+  .timer-actions button, .timer-actions select { flex: 1; }
+  .timer-card .soft {
+    box-sizing: border-box;
+    height: 32px;
+    font-size: 12.5px;
+    padding: 0 8px;
+    border-radius: 6px;
+    border: 1px solid #BBC0C7;
+    background: #BBC0C7;
+    color: #000000;
+    cursor: pointer;
+    width: 100%;
+  }
+  .timer-card .soft:hover { filter: brightness(0.97); }
+  .timer-start-btn {
+    width: 100%;
+    box-sizing: border-box;
+    height: 38px;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    border-radius: 6px;
+    border: 1px solid #74777B;
+    background: #74777B;
+    color: var(--on-accent);
+    cursor: pointer;
+  }
+  .timer-start-btn:hover { filter: brightness(0.95); }
+  .timer-summary {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 10px;
+  }
+  .log-status {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    min-height: 15px;
+  }
+  .log-status.error { color: var(--red); }
+  .timer-templates {
+    margin: 10px -16px 0;
+    padding: 8px 16px 0;
+    border-top: 3px solid #FF6400;
+  }
+  .timer-template-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .timer-template-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .timer-template-bar {
+    flex: 1;
+    display: flex;
+    height: 20px;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid var(--border-light);
+  }
+  .timer-template-bar:hover { border-color: var(--accent); }
+  .timer-template-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 600;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .timer-template-remove {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 4px;
+  }
+  .timer-template-remove:hover { color: var(--red); }
+  .timer-template-total {
+    font-size: 11px;
+    color: var(--text-muted);
+    min-width: 42px;
+    text-align: right;
+  }
+  #timerSaveTemplate { width: 100%; }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="page-header">
+    <h1><span class="icon-hint" id="urlHint">⏱<span class="icon-tooltip" id="urlTooltip">Voorbeeld: http://localhost:3001/?t=1-5,2-10,3-10,4-5&f=E-mailverwerking</span></span> <span id="pageTitle">Focustimer</span></h1>
+    <svg class="header-logo" id="headerLogo" width="224" height="34" viewBox="0 0 334 51" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path data-color-index="3" data-color="#0F4DA8" d="M330.912 47.4822H258.71" stroke="#0F4DA8" stroke-width="5.08872" stroke-linecap="round"/>
+      <path data-color-index="2" data-color="#FFA100" d="M250.813 47.483C237.502 47.483 227.891 42.9323 219.842 36.5008C211.752 30.0358 205.24 21.6703 198.138 14.1164" stroke="#FFA100" stroke-width="5.08872" stroke-linecap="round"/>
+      <path data-color-index="1" data-color="#FF6400" d="M78.3643 40.1133C109.015 24.9688 124.693 4.20386 155.604 3C173.733 3 184.803 11.9656 194.72 22.5135" stroke="#FF6400" stroke-width="5.08872" stroke-linecap="round"/>
+      <path data-color-index="0" data-color="#00A383" d="M3 47.4565C37.1098 47.4565 60.1067 40.5308 78.0005 31.6896" stroke="#00A383" stroke-width="5.08872" stroke-linecap="round"/>
+    </svg>
+    <button id="themeToggle" class="theme-toggle" title="Wissel tussen licht en donker" aria-label="Wissel tussen licht en donker"></button>
+  </div>
+
+  <div class="timer-card" id="timerCard">
+    <textarea id="taskNameInput" class="task-name-input" placeholder="Wat ga ik doen en waarom is deze taak belangrijk?" rows="1"></textarea>
+    <div id="timerPhases"></div>
+    <div class="timer-actions" id="timerActions">
+      <select id="timerAddPhase" class="soft" aria-label="Fase toevoegen">
+        <option value="">+ Fase toevoegen</option>
+        <option value="Focus in">Focus in</option>
+        <option value="Focus on">Focus on</option>
+        <option value="Finish up">Finish up</option>
+        <option value="Focus off">Focus off</option>
+      </select>
+      <button id="timerReset" class="soft">↺ Reset</button>
+    </div>
+    <button id="timerStartStop" class="timer-start-btn">START</button>
+    <div class="timer-summary">
+      <div id="timerTotal">Totale tijd: –</div>
+      <div id="timerEndTime">Eindtijd: –</div>
+    </div>
+    <div id="logStatus" class="log-status"></div>
+    <div class="timer-templates">
+      <div id="timerTemplatesContent">
+        <div id="timerTemplateList" class="timer-template-list"></div>
+        <button id="timerSaveTemplate" class="soft">Bewaar huidige opzet als template</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+
+function initTheme() {
+  const saved = localStorage.getItem('timerapp-theme');
+  applyTheme(saved === 'dark' ? 'dark' : 'light');
+}
+
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('timerapp-theme', next);
+  applyTheme(next);
+});
+
+const el = (id) => document.getElementById(id);
+
+el('urlHint').addEventListener('click', () => {
+  const tooltip = el('urlTooltip');
+  const exampleUrl = tooltip.textContent.replace(/^Voorbeeld:\s*/, '');
+  navigator.clipboard.writeText(exampleUrl).then(() => {
+    const original = tooltip.textContent;
+    tooltip.textContent = 'Gekopieerd!';
+    setTimeout(() => { tooltip.textContent = original; }, 1200);
+  });
+});
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+const TIMER_PALETTE = [
+  { bg: '--timer-blue-bg', text: '--timer-blue' },
+  { bg: '--timer-pink-bg', text: '--timer-pink' },
+  { bg: '--timer-yellow-bg', text: '--timer-yellow' },
+  { bg: '--timer-green-bg', text: '--timer-green' },
+];
+const PHASE_TYPES = [
+  { label: 'Focus in', colorIndex: 0 },
+  { label: 'Focus on', colorIndex: 1 },
+  { label: 'Finish up', colorIndex: 2 },
+  { label: 'Focus off', colorIndex: 3 },
+];
+const DEFAULT_TIMER_PHASES = [
+  { label: 'Focus in', minutes: 5, colorIndex: 0 },
+  { label: 'Focus on', minutes: 40, colorIndex: 1 },
+  { label: 'Finish up', minutes: 5, colorIndex: 2 },
+  { label: 'Focus off', minutes: 10, colorIndex: 3 },
+];
+const DEFAULT_TIMER_TEMPLATES = [
+  [['Focus in', 5], ['Focus on', 15], ['Finish up', 5], ['Focus off', 5]],
+  [['Focus in', 5], ['Focus on', 40], ['Finish up', 5], ['Focus off', 10]],
+  [['Focus in', 5], ['Focus on', 20], ['Focus off', 5], ['Focus on', 20], ['Finish up', 5], ['Focus off', 5]],
+  [['Focus in', 5], ['Focus on', 60], ['Finish up', 10], ['Focus off', 15]],
+  [['Focus in', 5], ['Focus on', 30], ['Focus off', 5], ['Focus on', 30], ['Finish up', 5], ['Focus off', 15]],
+].map((template) => template.map(([label, minutes]) => {
+  const type = PHASE_TYPES.find((t) => t.label === label);
+  return { label: type.label, minutes, colorIndex: type.colorIndex };
+}));
+
+function parsePhasesFromUrl() {
+  const t = new URLSearchParams(window.location.search).get('t');
+  if (!t) return null;
+  try {
+    const entries = t.split(',').slice(0, 9).map((entry) => {
+      const [typeNum, minutes] = entry.split('-');
+      const type = PHASE_TYPES[Number(typeNum) - 1];
+      const mins = Number(minutes);
+      if (!type || !Number.isFinite(mins) || mins < 1) throw new Error('invalid phase entry');
+      return { label: type.label, minutes: mins, colorIndex: type.colorIndex };
+    });
+    return entries.length > 0 ? entries : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function parseTaskNameFromUrl() {
+  const f = new URLSearchParams(window.location.search).get('f');
+  return f ? f : null;
+}
+
+let timerPhases = parsePhasesFromUrl() || loadTimerPhases();
+let timerTemplates = loadTimerTemplates();
+let taskName = parseTaskNameFromUrl() ?? loadTaskName();
+let timerRunning = false;
+let timerPhaseIndex = 0;
+let timerRemainingSeconds = 0;
+let timerEndTimestamp = null;
+let timerIntervalId = null;
+
+function resizeTaskNameInput() {
+  const textarea = el('taskNameInput');
+  textarea.style.height = 'auto';
+  textarea.style.height = `${textarea.scrollHeight}px`;
+}
+
+el('taskNameInput').value = taskName;
+resizeTaskNameInput();
+el('taskNameInput').addEventListener('input', (e) => {
+  taskName = e.target.value;
+  saveTaskName();
+  resizeTaskNameInput();
+});
+
+function loadTaskName() {
+  return localStorage.getItem('timerapp-taskname') || '';
+}
+
+function saveTaskName() {
+  localStorage.setItem('timerapp-taskname', taskName);
+}
+
+function loadTimerPhases() {
+  try {
+    const raw = localStorage.getItem('timerapp-phases');
+    if (!raw) return DEFAULT_TIMER_PHASES.map((p) => ({ ...p }));
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  } catch (e) {}
+  return DEFAULT_TIMER_PHASES.map((p) => ({ ...p }));
+}
+
+function saveTimerPhases() {
+  localStorage.setItem('timerapp-phases', JSON.stringify(timerPhases));
+}
+
+function loadTimerTemplates() {
+  try {
+    const raw = localStorage.getItem('timerapp-templates');
+    if (!raw) return DEFAULT_TIMER_TEMPLATES.map((t) => t.map((p) => ({ ...p })));
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+  } catch (e) {}
+  return DEFAULT_TIMER_TEMPLATES.map((t) => t.map((p) => ({ ...p })));
+}
+
+function saveTimerTemplates() {
+  localStorage.setItem('timerapp-templates', JSON.stringify(timerTemplates));
+}
+
+function formatMMSS(totalSeconds) {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+function formatHHMM(date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function timerTotalMinutes(phases) {
+  return phases.reduce((sum, p) => sum + p.minutes, 0);
+}
+
+function timerRemainingTotalSeconds() {
+  let total = timerRemainingSeconds;
+  for (let i = timerPhaseIndex + 1; i < timerPhases.length; i++) {
+    total += timerPhases[i].minutes * 60;
+  }
+  return total;
+}
+
+function renderTimerPhases() {
+  el('timerPhases').innerHTML = timerPhases.map((phase, i) => {
+    const palette = TIMER_PALETTE[phase.colorIndex % TIMER_PALETTE.length];
+    const isDone = timerRunning && i < timerPhaseIndex;
+    const isUpcoming = timerRunning && i > timerPhaseIndex;
+    const isActiveRunning = timerRunning && i === timerPhaseIndex;
+
+    let style;
+    let labelStyle = '';
+    if (isDone) {
+      style = `background:var(--bg-card); color:var(${palette.bg}); border-color:var(${palette.bg});`;
+      labelStyle = 'text-decoration:line-through;';
+    } else if (isUpcoming) {
+      style = `background:var(--bg-card); color:var(${palette.bg}); border-color:var(${palette.bg});`;
+    } else {
+      style = `background:var(${palette.bg}); color:var(${palette.text}); border-color:transparent;`;
+    }
+    if (isActiveRunning) style += ' cursor:pointer; user-select:none;';
+    if (timerRunning) labelStyle += ' pointer-events:none;';
+
+    const rightControl = timerRunning
+      ? `<span class="timer-phase-countdown">${i === timerPhaseIndex ? formatMMSS(timerRemainingSeconds) : formatMMSS(phase.minutes * 60)}</span>`
+      : `<input type="number" class="timer-phase-minutes" min="1" value="${phase.minutes}" data-index="${i}"><span class="timer-phase-unit">min</span><button class="timer-phase-remove" data-index="${i}" title="Verwijder fase" ${timerPhases.length <= 1 ? 'disabled' : ''}>✕</button>`;
+    return `<div class="timer-phase" data-index="${i}" style="${style}" ${isActiveRunning ? 'title="Klik om deze fase af te sluiten"' : ''}>
+      <input class="timer-phase-label" style="${labelStyle}" value="${escapeHtml(phase.label)}" data-index="${i}" ${timerRunning ? 'readonly' : ''}>
+      <div class="timer-phase-controls">${rightControl}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTimerTemplates() {
+  el('timerTemplateList').innerHTML = timerTemplates.map((template, i) => {
+    const total = timerTotalMinutes(template);
+    const bars = template.map((p) => {
+      const palette = TIMER_PALETTE[p.colorIndex % TIMER_PALETTE.length];
+      const pct = total > 0 ? (p.minutes / total) * 100 : 0;
+      return `<div class="timer-template-segment" style="flex-basis:${pct}%; background:var(${palette.bg}); color:var(${palette.text});">${p.minutes}</div>`;
+    }).join('');
+    return `<div class="timer-template-row">
+      <div class="timer-template-bar" data-index="${i}" title="Klik om te laden">${bars}</div>
+      <span class="timer-template-total">${total} min</span>
+      <button class="timer-template-remove" data-index="${i}" title="Verwijder template">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function renderHeaderLogo() {
+  const activeColorIndex = timerRunning ? timerPhases[timerPhaseIndex].colorIndex : null;
+  let activeColorHex = '';
+  document.querySelectorAll('#headerLogo path').forEach((path) => {
+    const isActiveColor = Number(path.dataset.colorIndex) === activeColorIndex;
+    path.style.stroke = (activeColorIndex === null || isActiveColor) ? path.dataset.color : '#BBC0C7';
+    if (isActiveColor) activeColorHex = path.dataset.color;
+  });
+  el('pageTitle').style.color = activeColorHex;
+  el('urlHint').style.color = activeColorHex;
+}
+
+function renderTimer() {
+  renderTimerPhases();
+  renderTimerTemplates();
+  renderHeaderLogo();
+
+  el('taskNameInput').disabled = timerRunning;
+
+  const startStopBtn = el('timerStartStop');
+  startStopBtn.textContent = timerRunning ? 'STOP' : 'START';
+  el('timerActions').style.display = timerRunning ? 'none' : 'flex';
+  el('timerTemplatesContent').style.display = timerRunning ? 'none' : '';
+
+  if (timerRunning) {
+    el('timerTotal').textContent = `Totale tijd over: ${formatMMSS(timerRemainingTotalSeconds())}`;
+    el('timerEndTime').textContent = `Eindtijd: ${timerEndTimestamp ? formatHHMM(timerEndTimestamp) : '–'}`;
+  } else {
+    const total = timerTotalMinutes(timerPhases);
+    el('timerTotal').textContent = `Totale tijd: ${total} min`;
+    const projectedEnd = new Date(Date.now() + total * 60000);
+    el('timerEndTime').textContent = `Eindtijd: ${formatHHMM(projectedEnd)}`;
+  }
+}
+
+// De timer rekent met een eindtijdstip per fase in plaats van te tellen: op een telefoon
+// staan JS-timers stil zodra de app naar de achtergrond gaat, en zo blijft de stand toch kloppen.
+let phaseEndAt = null;
+let wakeLock = null;
+
+// Draait de pagina op de eigen Node-server (poort 3001)? Dan schrijft die stil naar de dagnotitie;
+// anders (bijv. GitHub Pages op de telefoon) gaat de logregel via de Advanced URI-plugin van Obsidian.
+const LOG_VIA_SERVER = location.port === '3001';
+const OBSIDIAN_VAULT = 'SecondBrain';
+const DAILY_NOTES_FOLDER = '1. Persoonlijk/3.📝notities/1. Dagelijks';
+
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+  } catch (e) {
+    wakeLock = null;
+  }
+}
+
+function releaseWakeLock() {
+  if (!wakeLock) return;
+  wakeLock.release().catch(() => {});
+  wakeLock = null;
+}
+
+function enterPhase(index, endAtMs) {
+  timerPhaseIndex = index;
+  phaseEndAt = endAtMs;
+  timerRemainingSeconds = Math.max(0, Math.ceil((endAtMs - Date.now()) / 1000));
+}
+
+function syncTimer() {
+  if (!timerRunning) return;
+  let remainingMs = phaseEndAt - Date.now();
+  while (remainingMs <= 0) {
+    const next = timerPhaseIndex + 1;
+    if (next >= timerPhases.length) {
+      stopTimer(true, new Date(phaseEndAt));
+      return;
+    }
+    enterPhase(next, phaseEndAt + timerPhases[next].minutes * 60000);
+    remainingMs = phaseEndAt - Date.now();
+  }
+  timerRemainingSeconds = Math.ceil(remainingMs / 1000);
+  renderTimer();
+}
+
+function advanceToNextPhase() {
+  const next = timerPhaseIndex + 1;
+  if (next >= timerPhases.length) {
+    stopTimer(true);
+    return;
+  }
+  enterPhase(next, Date.now() + timerPhases[next].minutes * 60000);
+  timerEndTimestamp = new Date(Date.now() + timerRemainingTotalSeconds() * 1000);
+  renderTimer();
+}
+
+function formatDateLocal(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function buildLogSentence(text, minutes, stoppedEarly) {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const needsPeriod = !/[.!?]$/.test(trimmed);
+  const taskSentence = `De taak was ${trimmed}${needsPeriod ? '.' : ''}`;
+  const duration = `${minutes} ${minutes === 1 ? 'minuut' : 'minuten'}`;
+  const usageSentence = stoppedEarly
+    ? `Focus voor ${duration}, wel voortijdig gestopt.`
+    : `Focus voor ${duration}.`;
+  return `${usageSentence} ${taskSentence} [[Lijst met Focusrecaps|FOCUS_RECAP]]`;
+}
+
+function showLogStatus(text, isError) {
+  const status = el('logStatus');
+  status.textContent = text;
+  status.classList.toggle('error', !!isError);
+  setTimeout(() => { status.textContent = ''; status.classList.remove('error'); }, 5000);
+}
+
+function submitLogEntry(minutes, stoppedEarly, when) {
+  const sentence = buildLogSentence(taskName, minutes, stoppedEarly);
+  if (!sentence) return;
+  const hh = String(when.getHours()).padStart(2, '0');
+  const mm = String(when.getMinutes()).padStart(2, '0');
+  const line = `- ${hh}:${mm}: ${sentence}`;
+
+  if (!LOG_VIA_SERVER) {
+    const filepath = `${DAILY_NOTES_FOLDER}/${formatDateLocal(when)}.md`;
+    const url = `obsidian://advanced-uri?vault=${encodeURIComponent(OBSIDIAN_VAULT)}`
+      + `&filepath=${encodeURIComponent(filepath)}&mode=append&data=${encodeURIComponent(`\n${line}`)}`;
+    showLogStatus('Geopend in Obsidian om toe te voegen aan dagnotitie');
+    window.location.href = url;
+    return;
+  }
+
+  fetch('/api/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ line }),
+  })
+    .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+    .then(({ ok, data }) => {
+      showLogStatus(ok ? 'Toegevoegd aan dagnotitie ✓' : `Fout: ${data.error || 'onbekend'}`, !ok);
+    })
+    .catch(() => showLogStatus('Kon niet verbinden met server', true));
+}
+
+function startTimer() {
+  if (timerPhases.length === 0) return;
+  timerRunning = true;
+  enterPhase(0, Date.now() + timerPhases[0].minutes * 60000);
+  timerEndTimestamp = new Date(Date.now() + timerTotalMinutes(timerPhases) * 60000);
+  timerIntervalId = setInterval(syncTimer, 1000);
+  acquireWakeLock();
+  renderTimer();
+}
+
+function stopTimer(completed, endedAt) {
+  const plannedMinutes = timerTotalMinutes(timerPhases);
+  if (!completed) timerRemainingSeconds = Math.max(0, Math.ceil((phaseEndAt - Date.now()) / 1000));
+  const minutes = completed
+    ? plannedMinutes
+    : Math.max(0, Math.round((plannedMinutes * 60 - timerRemainingTotalSeconds()) / 60));
+  submitLogEntry(minutes, !completed, endedAt || new Date());
+  timerRunning = false;
+  timerPhaseIndex = 0;
+  timerRemainingSeconds = 0;
+  timerEndTimestamp = null;
+  phaseEndAt = null;
+  if (timerIntervalId) {
+    clearInterval(timerIntervalId);
+    timerIntervalId = null;
+  }
+  releaseWakeLock();
+  renderTimer();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !timerRunning) return;
+  syncTimer();
+  acquireWakeLock();
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+el('timerStartStop').addEventListener('click', () => {
+  if (timerRunning) stopTimer(false);
+  else startTimer();
+});
+
+el('timerAddPhase').addEventListener('change', (e) => {
+  const chosenLabel = e.target.value;
+  if (!chosenLabel) return;
+  const phaseType = PHASE_TYPES.find((t) => t.label === chosenLabel);
+  timerPhases.push({ label: phaseType.label, minutes: 5, colorIndex: phaseType.colorIndex });
+  saveTimerPhases();
+  renderTimer();
+  el('timerAddPhase').value = '';
+});
+
+el('timerReset').addEventListener('click', () => {
+  if (timerRunning) stopTimer(false);
+  timerPhases = DEFAULT_TIMER_PHASES.map((p) => ({ ...p }));
+  saveTimerPhases();
+  taskName = '';
+  el('taskNameInput').value = '';
+  saveTaskName();
+  resizeTaskNameInput();
+  renderTimer();
+});
+
+el('timerSaveTemplate').addEventListener('click', () => {
+  timerTemplates.push(timerPhases.map((p) => ({ ...p })));
+  saveTimerTemplates();
+  renderTimer();
+});
+
+el('timerPhases').addEventListener('input', (e) => {
+  const index = e.target.dataset.index;
+  if (index === undefined) return;
+  const i = Number(index);
+  if (e.target.classList.contains('timer-phase-label')) {
+    timerPhases[i].label = e.target.value;
+    saveTimerPhases();
+  } else if (e.target.classList.contains('timer-phase-minutes')) {
+    const minutes = Math.max(1, Number(e.target.value) || 1);
+    timerPhases[i].minutes = minutes;
+    saveTimerPhases();
+    renderTimer();
+  }
+});
+
+el('timerPhases').addEventListener('click', (e) => {
+  const removeBtn = e.target.closest('.timer-phase-remove');
+  if (removeBtn) {
+    const i = Number(removeBtn.dataset.index);
+    if (timerPhases.length <= 1) return;
+    timerPhases.splice(i, 1);
+    saveTimerPhases();
+    renderTimer();
+    return;
+  }
+
+  const phaseRow = e.target.closest('.timer-phase');
+  if (phaseRow && timerRunning && Number(phaseRow.dataset.index) === timerPhaseIndex) {
+    advanceToNextPhase();
+  }
+});
+
+el('timerTemplateList').addEventListener('click', (e) => {
+  const removeBtn = e.target.closest('.timer-template-remove');
+  if (removeBtn) {
+    timerTemplates.splice(Number(removeBtn.dataset.index), 1);
+    saveTimerTemplates();
+    renderTimer();
+    return;
+  }
+  const bar = e.target.closest('.timer-template-bar');
+  if (bar && !timerRunning) {
+    const template = timerTemplates[Number(bar.dataset.index)];
+    timerPhases = template.map((p) => ({ ...p }));
+    saveTimerPhases();
+    renderTimer();
+  }
+});
+
+initTheme();
+renderTimer();
+</script>
+</body>
+</html>
