@@ -258,6 +258,20 @@
     min-height: 15px;
   }
   .log-status.error { color: var(--red); }
+  .log-obsidian-btn {
+    width: 100%;
+    box-sizing: border-box;
+    height: 38px;
+    margin-top: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid #FF6400;
+    background: #FF6400;
+    color: #fff;
+    cursor: pointer;
+  }
+  .log-obsidian-btn[hidden] { display: none; }
   .timer-templates {
     margin: 10px -16px 0;
     padding: 8px 16px 0;
@@ -345,6 +359,7 @@
       <div id="timerEndTime">Eindtijd: –</div>
     </div>
     <div id="logStatus" class="log-status"></div>
+    <button id="logObsidianBtn" class="log-obsidian-btn" hidden>Logregel toevoegen in Obsidian</button>
     <div class="timer-templates">
       <div id="timerTemplatesContent">
         <div id="timerTemplateList" class="timer-template-list"></div>
@@ -712,6 +727,27 @@ function showLogStatus(text, isError) {
   setTimeout(() => { status.textContent = ''; status.classList.remove('error'); }, 5000);
 }
 
+// iOS opent een andere app (obsidian://) alleen als directe reactie op een tik. Bij STOP/Reset kan
+// dat dus meteen; loopt de timer vanzelf af, dan zetten we de logregel klaar achter een knop.
+let pendingObsidianUrl = localStorage.getItem('timerapp-pending-log') || '';
+
+function showPendingLogButton() {
+  el('logObsidianBtn').hidden = !pendingObsidianUrl;
+}
+
+function openPendingLog() {
+  if (!pendingObsidianUrl) return;
+  const url = pendingObsidianUrl;
+  pendingObsidianUrl = '';
+  localStorage.removeItem('timerapp-pending-log');
+  showPendingLogButton();
+  showLogStatus('Geopend in Obsidian om toe te voegen aan dagnotitie');
+  window.location.href = url;
+}
+
+el('logObsidianBtn').addEventListener('click', openPendingLog);
+showPendingLogButton();
+
 function submitLogEntry(minutes, stoppedEarly, when) {
   const sentence = buildLogSentence(taskName, minutes, stoppedEarly);
   if (!sentence) return;
@@ -723,8 +759,15 @@ function submitLogEntry(minutes, stoppedEarly, when) {
     const filepath = `${DAILY_NOTES_FOLDER}/${formatDateLocal(when)}.md`;
     const url = `obsidian://advanced-uri?vault=${encodeURIComponent(OBSIDIAN_VAULT)}`
       + `&filepath=${encodeURIComponent(filepath)}&mode=append&data=${encodeURIComponent(`\n${line}`)}`;
-    showLogStatus('Geopend in Obsidian om toe te voegen aan dagnotitie');
-    window.location.href = url;
+    if (stoppedEarly) {
+      showLogStatus('Geopend in Obsidian om toe te voegen aan dagnotitie');
+      window.location.href = url;
+    } else {
+      pendingObsidianUrl = url;
+      localStorage.setItem('timerapp-pending-log', url);
+      showPendingLogButton();
+      showLogStatus('Timer klaar — tik op de knop om de logregel in Obsidian te zetten');
+    }
     return;
   }
 
