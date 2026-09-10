@@ -364,6 +364,8 @@ document.getElementById('themeToggle').addEventListener('click', () => {
 
 const el = (id) => document.getElementById(id);
 
+el('urlTooltip').textContent = `Voorbeeld: ${location.origin}${location.pathname}?t=1-5,2-10,3-10,4-5&f=E-mailverwerking`;
+
 el('urlHint').addEventListener('click', () => {
   const tooltip = el('urlTooltip');
   const exampleUrl = tooltip.textContent.replace(/^Voorbeeld:\s*/, '');
