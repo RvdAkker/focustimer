@@ -679,11 +679,8 @@ function enterPhase(index, endAtMs) {
   timerRemainingSeconds = Math.max(0, Math.ceil((endAtMs - Date.now()) / 1000));
 }
 
-// Klankschaal-opname. Het bestand duurt 16 sec; we laten er ~10 van horen en faden het laatste
-// stuk uit, zodat de lengte in code te wijzigen is zonder het bestand opnieuw te bewerken.
+// Klankschaal-opname (16 sec), wordt in zijn geheel afgespeeld.
 const BOWL_FILE = 'klankschaal.mp3';
-const BOWL_SECONDS = 10;
-const BOWL_FADE_SECONDS = 1.5;
 let audioCtx = null;
 let bowlBuffer = null;
 let bowlLoading = null;
@@ -712,17 +709,10 @@ function loadBowl(ctx) {
 
 function startBowl(ctx, buffer) {
   if (!buffer) return;
-  const now = ctx.currentTime;
-  const duur = Math.min(BOWL_SECONDS, buffer.duration);
   const source = ctx.createBufferSource();
-  const env = ctx.createGain();
   source.buffer = buffer;
-  env.gain.setValueAtTime(1, now);
-  env.gain.setValueAtTime(1, now + Math.max(0, duur - BOWL_FADE_SECONDS));
-  env.gain.linearRampToValueAtTime(0, now + duur);
-  source.connect(env).connect(bowlOutput || ctx.destination);
-  source.start(now);
-  source.stop(now + duur);
+  source.connect(bowlOutput || ctx.destination);
+  source.start();
 }
 
 function playBowl() {
