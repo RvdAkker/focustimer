@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Focustimer</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#f7f6f4">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f6f4">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1a1a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -380,16 +381,19 @@ function applyTheme(theme) {
   document.getElementById('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
 }
 
+// Bij openen volgt de app de licht/donker-instelling van het apparaat, en hij schakelt mee
+// als die instelling verandert. De knop is een tijdelijke afwijking voor deze sessie.
+const apparaatDonker = window.matchMedia('(prefers-color-scheme: dark)');
+
 function initTheme() {
-  const saved = localStorage.getItem('timerapp-theme');
-  applyTheme(saved === 'dark' ? 'dark' : 'light');
+  applyTheme(apparaatDonker.matches ? 'dark' : 'light');
 }
+
+apparaatDonker.addEventListener('change', (e) => applyTheme(e.matches ? 'dark' : 'light'));
 
 document.getElementById('themeToggle').addEventListener('click', () => {
   const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-  const next = current === 'dark' ? 'light' : 'dark';
-  localStorage.setItem('timerapp-theme', next);
-  applyTheme(next);
+  applyTheme(current === 'dark' ? 'light' : 'dark');
 });
 
 const el = (id) => document.getElementById(id);
